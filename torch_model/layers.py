@@ -45,11 +45,11 @@ class Attention(nn.Module):
         return torch.sum(weighted_input, 1)
 
 
-class CapsLayer(nn.Module):
+class CapsuleLayer(nn.Module):
     def __init__(self, input_dim_capsule=120, num_capsule=5, dim_capsule=16,
                  routings=4, kernel_size=(9, 1), share_weights=True,
-                 activation='default', **kwargs):
-        super(CapsLayer, self).__init__(**kwargs)
+                 t_epsilon=1e-7, batch_size=1024, activation='default', **kwargs):
+        super(CapsuleLayer, self).__init__(**kwargs)
 
         self.num_capsule = num_capsule
         self.dim_capsule = dim_capsule
@@ -57,8 +57,7 @@ class CapsLayer(nn.Module):
         self.kernel_size = kernel_size
         self.share_weights = share_weights
 
-        self.t_epsilon = 1e-7
-        batch_size = 1024
+        self.t_epsilon = t_epsilon
 
         if activation == 'default':
             self.activation = self.squash
@@ -100,3 +99,55 @@ class CapsLayer(nn.Module):
         s_squared_norm = (x ** 2).sum(axis, keepdim=True)
         scale = torch.sqrt(s_squared_norm + self.t_epsilon)
         return x / scale
+
+
+class BackHook(torch.nn.Module):
+    def __init__(self, hook):
+        super(BackHook, self).__init__()
+        self._hook = hook
+        self.register_backward_hook(self._backward)
+
+    def forward(self, *inp):
+        return inp
+
+    @staticmethod
+    def _backward(self, grad_in, grad_out):
+        self._hook()
+        return None
+
+
+class WeightDrop(torch.nn.Module):
+    def __init__(self, module, weights, dropout=0, variational=False):
+        super(WeightDrop, self).__init__()
+        self.module = module
+        self.weights = weights
+        self.dropout = dropout
+        self.variational = variational
+        self._setup()
+        self.hooker = BackHook(lambda: self._backward())
+
+    def _setup(self):
+        for name_w in self.weights:
+            w = getattr(self.module, name_w)
+            self.register_parameter(name_w + '_raw', nn.Parameter(w.data))
+
+    def _setweights(self):
+        for name_w in self.weights:
+            raw_w = getattr(self, name_w + '_raw')
+            mask = raw_w.new_ones((raw_w.size(0), 1))
+            mask = torch.nn.functional.dropout(mask, p=self.dropout, training=True)
+            w = mask.expand_as(raw_w) * raw_w
+            rnn_w = getattr(self.module, name_w)
+            rnn_w.data.copy_(w)
+            setattr(self, name_w + '_mask', mask)
+
+    def _backward(self):
+        # transfer gradients from embeddedRNN to raw params
+        for name_w in self.weights:
+            raw_w = getattr(self, name_w + '_raw')
+            rnn_w = getattr(self.module, name_w)
+            raw_w.grad = rnn_w.grad * getattr(self, name_w + '_mask')
+
+    def forward(self, *args):
+        self._setweights()
+        return self.module(*self.hooker(*args))
