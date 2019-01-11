@@ -14,7 +14,7 @@ class CyclicLR(object):
 
         if isinstance(base_lr, list) or isinstance(base_lr, tuple):
             if len(base_lr) != len(optimizer.param_groups):
-                raise ValueError("expected {} base_lr, got {}".format(
+                raise ValueError('expected {} base_lr, got {}'.format(
                     len(optimizer.param_groups), len(base_lr)))
             self.base_lrs = list(base_lr)
         else:
@@ -22,7 +22,7 @@ class CyclicLR(object):
 
         if isinstance(max_lr, list) or isinstance(max_lr, tuple):
             if len(max_lr) != len(optimizer.param_groups):
-                raise ValueError("expected {} max_lr, got {}".format(
+                raise ValueError('expected {} max_lr, got {}'.format(
                     len(optimizer.param_groups), len(max_lr)))
             self.max_lrs = list(max_lr)
         else:

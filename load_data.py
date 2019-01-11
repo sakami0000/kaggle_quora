@@ -16,28 +16,28 @@ def get_coefs(word, *arr):
 
 
 def load_and_prec():
-    train_df = pd.read_csv("../input/train.csv")
-    test_df = pd.read_csv("../input/test.csv")
+    train_df = pd.read_csv('../input/train.csv')
+    test_df = pd.read_csv('../input/test.csv')
 
     # lower
-    train_df["question_text"] = train_df["question_text"].apply(lambda x: x.lower())
-    test_df["question_text"] = test_df["question_text"].apply(lambda x: x.lower())
+    train_df['question_text'] = train_df['question_text'].apply(lambda x: x.lower())
+    test_df['question_text'] = test_df['question_text'].apply(lambda x: x.lower())
 
-    # Clean the text
-    train_df["question_text"] = train_df["question_text"].apply(lambda x: clean_text(x))
-    test_df["question_text"] = test_df["question_text"].apply(lambda x: clean_text(x))
+    # clean the text
+    train_df['question_text'] = train_df['question_text'].apply(lambda x: clean_text(x))
+    test_df['question_text'] = test_df['question_text'].apply(lambda x: clean_text(x))
 
-    # Clean numbers
-    train_df["question_text"] = train_df["question_text"].apply(lambda x: clean_numbers(x))
-    test_df["question_text"] = test_df["question_text"].apply(lambda x: clean_numbers(x))
+    # clean numbers
+    train_df['question_text'] = train_df['question_text'].apply(lambda x: clean_numbers(x))
+    test_df['question_text'] = test_df['question_text'].apply(lambda x: clean_numbers(x))
 
-    # Clean spellings
-    train_df["question_text"] = train_df["question_text"].apply(lambda x: replace_typical_misspell(x))
-    test_df["question_text"] = test_df["question_text"].apply(lambda x: replace_typical_misspell(x))
+    # clean spellings
+    train_df['question_text'] = train_df['question_text'].apply(lambda x: replace_typical_misspell(x))
+    test_df['question_text'] = test_df['question_text'].apply(lambda x: replace_typical_misspell(x))
 
     # fill up the missing values
-    train_x = train_df["question_text"].fillna("_##_").values
-    test_x = test_df["question_text"].fillna("_##_").values
+    train_x = train_df['question_text'].fillna('_##_').values
+    test_x = test_df['question_text'].fillna('_##_').values
 
     # load embedding
     embeddings_index = dict(get_coefs(*o.split(" ")) for o in open(EMBEDDING_GLOVE))
@@ -54,17 +54,17 @@ def load_and_prec():
     features = ss.transform(features)
     test_features = ss.transform(test_features)
 
-    # Tokenize the sentences
+    # tokenize the sentences
     tokenizer = Tokenizer(num_words=max_features)
     tokenizer.fit_on_texts(list(train_x))
     train_x = tokenizer.texts_to_sequences(train_x)
     test_x = tokenizer.texts_to_sequences(test_x)
 
-    # Pad the sentences
+    # pad the sentences
     train_x = pad_sequences(train_x, maxlen=maxlen)
     test_x = pad_sequences(test_x, maxlen=maxlen)
 
-    # Get the target values
+    # get the target values
     train_y = train_df['target'].values
 
     # shuffling the data
@@ -105,7 +105,7 @@ def load_glove(embeddings_index, word_index):
 
 def load_para(word_index):
     embeddings_index = dict(
-        get_coefs(*o.split(" "))
+        get_coefs(*o.split(' '))
         for o in open(EMBEDDING_PARA, encoding='utf8', errors='ignore')
         if len(o) > 100)
 
