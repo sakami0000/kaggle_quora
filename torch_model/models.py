@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from config import max_features, maxlen, embed_size
-from torch_model.layers import Attention, CapsuleLayer
+from torch_model.layers import Attention, CapsuleLayer, WeightDrop
 
 
 class LstmGruAtten(nn.Module):
@@ -14,8 +14,8 @@ class LstmGruAtten(nn.Module):
         self.embedding = nn.Embedding(max_features, embed_size)
         self.embedding.weight = nn.Parameter(torch.tensor(embedding_matrix, dtype=torch.float32))
         self.embedding.weight.requires_grad = False
-
         self.embedding_dropout = nn.Dropout2d(0.1)
+
         self.lstm = nn.LSTM(embed_size, hidden_size, bidirectional=True, batch_first=True)
         self.gru = nn.GRU(hidden_size * 2, hidden_size, bidirectional=True, batch_first=True)
 
@@ -52,9 +52,9 @@ class LstmGruAtten(nn.Module):
         return out
 
 
-class HiddenGru(nn.Module):
+class WeightDropLstm(nn.Module):
     def __init__(self, embedding_matrix):
-        super(HiddenGru, self).__init__()
+        super(WeightDropLstm, self).__init__()
 
         hidden_size = 60
         self.hidden_size = hidden_size
@@ -62,10 +62,12 @@ class HiddenGru(nn.Module):
         self.embedding = nn.Embedding(max_features, embed_size)
         self.embedding.weight = nn.Parameter(torch.tensor(embedding_matrix, dtype=torch.float32))
         self.embedding.weight.requires_grad = False
-
         self.embedding_dropout = nn.Dropout2d(0.1)
-        self.lstm = nn.LSTM(embed_size, hidden_size, bidirectional=True, batch_first=True)
-        self.gru = nn.GRU(hidden_size * 2, hidden_size, bidirectional=True, batch_first=True)
+
+        self.lstm = WeightDrop(nn.LSTM(embed_size, hidden_size, bidirectional=True, batch_first=True),
+                               ['weight_hh_l0'], dropout=0.1)
+        self.gru = WeightDrop(nn.GRU(hidden_size * 2, hidden_size, bidirectional=True, batch_first=True),
+                              ['weight_hh_l0'], dropout=0.1)
 
         self.lstm_attention = Attention(hidden_size * 2, maxlen)
         self.gru_attention = Attention(hidden_size * 2, maxlen)
@@ -84,8 +86,8 @@ class HiddenGru(nn.Module):
         h_gru, hh_gru = self.gru(h_lstm)
 
         hh_gru = hh_gru.view(-1, self.hidden_size * 2)
-
         h_gru_atten = self.gru_attention(h_gru)
+
         avg_pool = torch.mean(h_gru, 1)
         max_pool, _ = torch.max(h_gru, 1)
 
