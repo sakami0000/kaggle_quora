@@ -40,7 +40,7 @@ def load_and_prec():
     test_x = test_df['question_text'].fillna('_##_').values
 
     # load embedding
-    embeddings_index = dict(get_coefs(*o.split(" ")) for o in open(EMBEDDING_GLOVE))
+    embeddings_index = dict(get_coefs(*o.split(' ')) for o in open(EMBEDDING_GLOVE))
 
     # add features
     train = add_features(embeddings_index, train_df)
