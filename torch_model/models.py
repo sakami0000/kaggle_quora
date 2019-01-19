@@ -110,7 +110,7 @@ class CapsuleNet(nn.Module):
         caps_out = 1
 
         num_capsule = 5
-        dim_capsule = 10
+        dim_capsule = 5
 
         self.embedding = nn.Embedding(max_features, embed_size)
         self.embedding.weight = nn.Parameter(torch.tensor(embedding_matrix, dtype=torch.float32))
@@ -127,12 +127,12 @@ class CapsuleNet(nn.Module):
         self.caps_layer = CapsuleLayer(input_dim_capsule=hidden_size * 2,
                                        num_capsule=num_capsule,
                                        dim_capsule=dim_capsule,
-                                       routings=5)
+                                       routings=4)
 
         self.linear = nn.Linear(hidden_size * 8 + caps_out + 1, 16)
         self.relu = nn.ReLU()
+        self.bn = nn.BatchNorm1d(16, momentum=0.5)
         self.dropout = nn.Dropout(0.1)
-        self.bn = nn.BatchNorm1d(16)
         self.out = nn.Linear(16, 1)
 
     def forward(self, x):
@@ -158,8 +158,8 @@ class CapsuleNet(nn.Module):
 
         conc = torch.cat((h_lstm_atten, h_gru_atten, avg_pool, max_pool, content3, f), 1)
         conc = self.relu(self.linear(conc))
-        conc = self.dropout(conc)
         conc = self.bn(conc)
+        conc = self.dropout(conc)
         out = self.out(conc)
 
         return out
