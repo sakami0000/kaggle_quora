@@ -9,6 +9,10 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
+def cos_annealing_lr(initial_lr, cur_epoch, epoch_per_cycle):
+    return initial_lr * (np.cos(np.pi * cur_epoch / epoch_per_cycle) + 1) / 2
+
+
 def threshold_search(y_true, y_proba):
     precision, recall, thresholds = precision_recall_curve(y_true, y_proba)
     thresholds = np.append(thresholds, 1.001)
