@@ -8,10 +8,6 @@ embed_size = 300
 max_features = 95000
 maxlen = 72
 
-batch_size = 1536
-train_epochs = 5
-n_splits = 5
-
 seed = 1029
 
 

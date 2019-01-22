@@ -46,7 +46,7 @@ class Attention(nn.Module):
 
 
 class CapsuleLayer(nn.Module):
-    def __init__(self, input_dim_capsule=120, num_capsule=5, dim_capsule=16,
+    def __init__(self, input_dim_capsule, num_capsule, dim_capsule,
                  routings=4, kernel_size=(9, 1), share_weights=True,
                  t_epsilon=1e-7, batch_size=1024, activation='default', **kwargs):
         super(CapsuleLayer, self).__init__(**kwargs)
