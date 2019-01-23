@@ -15,7 +15,7 @@ from utils import cos_annealing_lr, scoring, sigmoid
 warnings.filterwarnings('ignore')
 
 
-def train(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
+def train_torch(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
 
     train_x, test_x, train_y, features, test_features, word_index, embeddings_index = load_and_prec()
     embedding_matrix_1 = load_glove(embeddings_index, word_index)
@@ -56,7 +56,7 @@ def train(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
 
         scheduler = CyclicLR(optimizer, base_lr=base_lr, max_lr=max_lr,
                              step_size=step_size, mode='exp_range',
-                             gamma=0.9994)
+                             gamma=0.99994)
 
         train = torch.utils.data.TensorDataset(x_train_fold, y_train_fold)
         valid = torch.utils.data.TensorDataset(x_val_fold, y_val_fold)
@@ -162,7 +162,7 @@ def snapshot_train(neuralnet, n_cycle=2, epochs_per_cycle=5, n_splits=4, batch_s
         train_loader = torch.utils.data.DataLoader(train, batch_size=batch_size, shuffle=True)
         valid_loader = torch.utils.data.DataLoader(valid, batch_size=batch_size, shuffle=False)
 
-        print(f'Fold {fold + 1}')
+        print(f'\nFold {fold + 1}')
 
         for cycle in range(n_cycle):
 
