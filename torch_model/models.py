@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from config import max_features, maxlen, embed_size
-from torch_model.layers import Attention, CapsuleLayer, WeightDrop
+from torch_model.layers import Attention, CapsuleLayer, WeightDrop, CIN
 
 
 class LstmGruAtten(nn.Module):
@@ -161,5 +161,29 @@ class CapsuleNet(nn.Module):
         conc = self.bn(conc)
         conc = self.dropout(conc)
         out = self.out(conc)
+
+        return out
+
+
+class CINNet(nn.Module):
+    def __init__(self, embedding_matrix):
+        super(CINNet, self).__init__()
+
+        layer_sizes = (32, 32)
+
+        self.embedding = nn.Embedding(max_features, embed_size)
+        self.embedding.weight = nn.Parameter(torch.tensor(embedding_matrix, dtype=torch.float32))
+        self.embedding.weight.requires_grad = False
+        self.embedding_dropout = nn.Dropout2d(0.1)
+
+        self.cin = CIN(maxlen, layer_sizes)
+        self.out = nn.Linear(sum(layer_sizes) + 1, 1)
+
+    def forward(self, x):
+        h_embedding = self.embedding(x[0])
+        h_embedding = torch.squeeze(self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
+
+        cin = self.cin(h_embedding)
+        out = self.out(cin)
 
         return out

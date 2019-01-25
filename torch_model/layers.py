@@ -151,3 +151,78 @@ class WeightDrop(torch.nn.Module):
     def forward(self, *args):
         self._setweights()
         return self.module(*self.hooker(*args))
+
+
+class CIN(nn.Module):
+    def __init__(self, input_size, layer_sizes=(32, 32), activation='relu',
+                 bn=False, bias=True, direct=False, **kwargs):
+        if len(layer_sizes) == 0:
+            raise ValueError(
+                'layer_size must be a list(tuple) of length greater than 1')
+
+        super(CIN, self).__init__(**kwargs)
+        self.layer_sizes = (input_size,) + tuple(layer_sizes)
+        self.direct = direct
+        self.activation = activation
+        self.bn = bn
+        self.bias = bias
+
+        for i, layer_size in enumerate(self.layer_sizes[:-1]):
+            in_channels = input_size * layer_size
+            if self.direct or i == len(self.layer_sizes) - 2:
+                out_channels = self.layer_sizes[i + 1]
+            else:
+                out_channels = 2 * self.layer_sizes[i + 1]
+
+            conv = nn.Conv1d(in_channels, out_channels, kernel_size=1, bias=self.bias)
+            nn.init.xavier_uniform_(conv.weight)
+            setattr(self, f'conv1d_{i+1}', conv)
+
+            if self.bn:
+                setattr(self, f'conv1d_bn_{i+1}', nn.BatchNorm1d(out_channels))
+
+    def forward(self, x):
+        batch_size = x.size(0)
+        embed_size = x.size(2)
+
+        final_result = []
+        hidden_layers = []
+
+        x0 = torch.transpose(x, 1, 2)  # [N, K, H0]
+        hidden_layers.append(x0)
+        x0 = x0.unsqueeze(-1)  # [N, K, H0, 1]
+
+        for idx, layer_size in enumerate(self.layer_sizes[:-1]):
+            xk = hidden_layers[-1].unsqueeze(2)  # [N, K, 1, H_(k-1)]
+            out_product = torch.matmul(x0, xk)  # [N, K, H0, H_(k-1)]
+            out_product = out_product.view(batch_size, embed_size,
+                                           self.layer_sizes[0] * layer_size)  # [N, K, H0*H_(k-1)]
+            out_product = out_product.transpose(1, 2)  # [N, H0*H_(k-1), K]
+            conv = getattr(self, f'conv1d_{idx+1}')
+            zk = conv(out_product)  # [N, Hk*2, K] or [N, Hk, K]
+
+            if self.bn:
+                bn = getattr(self, f'conv1d_bn_{idx+1}')
+                zk = bn(zk)
+
+            if self.activation == 'relu':
+                zk = F.relu(zk)
+
+            if self.direct:
+                direct_connect = zk  # [N, Hk, K]
+                next_hidden = zk.transpose(1, 2)  # [N, K, Hk]
+            else:
+                if idx != len(self.layer_sizes) - 2:
+                    direct_connect, next_hidden = zk.split(self.layer_sizes[idx + 1], 1)
+                    next_hidden = next_hidden.transpose(1, 2)  # [N, K, Hk]
+                else:
+                    direct_connect = zk  # [N, Hk, K]
+                    next_hidden = 0
+
+            final_result.append(direct_connect)
+            hidden_layers.append(next_hidden)
+
+        out = torch.cat(final_result, 1)  # [N, H1+H2+...+Hk, K]
+        out = torch.sum(out, -1)  # [N, H1+H2+...+Hk]
+
+        return out
