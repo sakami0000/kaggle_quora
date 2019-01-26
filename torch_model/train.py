@@ -17,6 +17,7 @@ warnings.filterwarnings('ignore')
 
 def train_torch(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
 
+    # load data
     train_x, test_x, train_y, features, test_features, word_index, embeddings_index = load_and_prec()
     embedding_matrix_1 = load_glove(embeddings_index, word_index)
     embedding_matrix_2 = load_para(word_index)
@@ -26,6 +27,7 @@ def train_torch(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
     del embeddings_index, embedding_matrix_1, embedding_matrix_2
     gc.collect()
 
+    # train
     train_preds = np.zeros((len(train_x)))
     test_preds = np.zeros((len(test_x)))
 
@@ -49,7 +51,7 @@ def train_torch(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
         model = neuralnet(embedding_matrix)
         model.cuda()
 
-        loss_fn = torch.nn.BCEWithLogitsLoss(reduction="sum")
+        loss_fn = torch.nn.BCEWithLogitsLoss(reduction='sum')
         step_size = 300
         base_lr, max_lr = 0.001, 0.003
         optimizer = torch.optim.Adam(model.parameters())
@@ -91,8 +93,7 @@ def train_torch(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
                 f = f_val_fold[i * batch_size:(i + 1) * batch_size]
                 y_pred = model([x_batch, f]).detach()
 
-                if scheduler:
-                    scheduler.batch_step()
+                scheduler.batch_step()
 
                 avg_val_loss += loss_fn(y_pred, y_batch).item() / len(valid_loader)
                 valid_preds_fold[i * batch_size:(i + 1) * batch_size] = sigmoid(y_pred.cpu().numpy())[:, 0]
@@ -110,8 +111,10 @@ def train_torch(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
         train_preds[valid_idx] = valid_preds_fold
         test_preds += test_preds_fold / len(splits)
 
+    # search threshold
     search_result = scoring(train_y, train_preds)
 
+    # submit
     sub = pd.read_csv('../input/sample_submission.csv')
     sub.prediction = test_preds > search_result['threshold']
     sub.to_csv('submission.csv', index=False)
@@ -119,6 +122,7 @@ def train_torch(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
 
 def snapshot_train(neuralnet, n_cycle=2, epochs_per_cycle=5, n_splits=4, batch_size=1024):
 
+    # load data
     train_x, test_x, train_y, features, test_features, word_index, embeddings_index = load_and_prec()
     embedding_matrix_1 = load_glove(embeddings_index, word_index)
     embedding_matrix_2 = load_para(word_index)
@@ -128,6 +132,7 @@ def snapshot_train(neuralnet, n_cycle=2, epochs_per_cycle=5, n_splits=4, batch_s
     del embeddings_index, embedding_matrix_1, embedding_matrix_2
     gc.collect()
 
+    # train
     train_preds = np.zeros((len(train_x)))
     test_preds = np.zeros((len(test_x)))
 
@@ -153,7 +158,7 @@ def snapshot_train(neuralnet, n_cycle=2, epochs_per_cycle=5, n_splits=4, batch_s
         model = neuralnet(embedding_matrix)
         model.cuda()
 
-        loss_fn = torch.nn.BCEWithLogitsLoss(reduction="sum")
+        loss_fn = torch.nn.BCEWithLogitsLoss(reduction='sum')
         optimizer = torch.optim.Adam(model.parameters())
 
         train = torch.utils.data.TensorDataset(x_train_fold, y_train_fold)
@@ -213,8 +218,10 @@ def snapshot_train(neuralnet, n_cycle=2, epochs_per_cycle=5, n_splits=4, batch_s
             train_preds[valid_idx] += valid_preds_fold / n_cycle
             test_preds += test_preds_fold / (len(splits) * n_cycle)
 
+    # search threshold
     search_result = scoring(train_y, train_preds)
 
+    # submit
     sub = pd.read_csv('../input/sample_submission.csv')
     sub.prediction = test_preds > search_result['threshold']
     sub.to_csv('submission.csv', index=False)
