@@ -1,13 +1,15 @@
+from keras.initializers import glorot_normal, orthogonal
 from keras.layers import (
     Input, Dense, Dropout, Embedding, Reshape, Flatten,
     Conv2D, MaxPool2D, concatenate, SpatialDropout1D,
     Bidirectional, CuDNNLSTM, CuDNNGRU,
-    GlobalAveragePooling1D, GlobalMaxPooling1D
+    GlobalAveragePooling1D, GlobalMaxPooling1D,
+    BatchNormalization
 )
 from keras.models import Model
 
-from config import embed_size, max_features, maxlen
-from keras_model.layers import Attention, Capsule
+from config import embed_size, max_features, maxlen, seed
+from keras_model.layers import Attention, Capsule, CRF
 
 
 def model_cnn(embedding_matrix):
@@ -87,9 +89,9 @@ def model_gru_srk_atten(embedding_matrix):
 
     x = Dense(16, activation='relu')(x)
     x = Dropout(0.1)(x)
-    x = Dense(1, activation='sigmoid')(x)
+    outp = Dense(1, activation='sigmoid')(x)
 
-    model = Model(inputs=inp, outputs=x)
+    model = Model(inputs=inp, outputs=outp)
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
     return model
@@ -153,4 +155,25 @@ def capsule_model(embedding_matrix):
     model = Model(inputs=inp, outputs=outp)
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
+    return model
+
+
+def gru_crf(embedding_matrix):
+    inp = Input(shape=(maxlen,))
+    x = Embedding(max_features, embed_size, weights=[embedding_matrix], trainable=False)(inp)
+    x = SpatialDropout1D(rate=0.24)(x)
+    x = Bidirectional(CuDNNGRU(100, return_sequences=True,
+                               kernel_initializer=glorot_normal(seed=seed),
+                               recurrent_initializer=orthogonal(gain=1.0, seed=seed)))(x)
+
+    x = CRF(10, learn_mode='marginal', unroll=True)(x)
+
+    x = Flatten()(x)
+    x = Dense(100, activation='relu', kernel_initializer=glorot_normal(seed=seed))(x)
+    x = Dropout(0.2)(x)
+    x = BatchNormalization()(x)
+    outp = Dense(1, activation='sigmoid')(x)
+
+    model = Model(inputs=inp, outputs=outp)
+    model.compile(loss='binary_crossentropy', optimizer='adam')
     return model
