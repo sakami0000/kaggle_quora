@@ -2,12 +2,12 @@ import torch
 import torch.nn as nn
 
 from config import max_features, maxlen, embed_size
-from torch_model.layers import Attention, CapsuleLayer, WeightDrop, CIN
+from torch_model.layers import Attention, CapsuleLayer, WeightDrop, CIN, SelfAttention
 
 
-class LstmGruAtten(nn.Module):
+class SelfAttentionClassifier(nn.Module):
     def __init__(self, embedding_matrix):
-        super(LstmGruAtten, self).__init__()
+        super(SelfAttentionClassifier, self).__init__()
 
         hidden_size = 60
 
@@ -19,8 +19,8 @@ class LstmGruAtten(nn.Module):
         self.lstm = nn.LSTM(embed_size, hidden_size, bidirectional=True, batch_first=True)
         self.gru = nn.GRU(hidden_size * 2, hidden_size, bidirectional=True, batch_first=True)
 
-        self.lstm_attention = Attention(hidden_size * 2, maxlen)
-        self.gru_attention = Attention(hidden_size * 2, maxlen)
+        self.lstm_attention = SelfAttention(hidden_size * 2)
+        self.gru_attention = SelfAttention(hidden_size * 2)
 
         self.linear = nn.Linear(hidden_size * 8 + 1, 16)
         self.relu = nn.ReLU()
@@ -115,8 +115,8 @@ class CapsuleNet(nn.Module):
         self.embedding = nn.Embedding(max_features, embed_size)
         self.embedding.weight = nn.Parameter(torch.tensor(embedding_matrix, dtype=torch.float32))
         self.embedding.weight.requires_grad = False
-
         self.embedding_dropout = nn.Dropout2d(0.1)
+
         self.lstm = nn.LSTM(embed_size, hidden_size, bidirectional=True, batch_first=True)
         self.gru = nn.GRU(hidden_size * 2, hidden_size, bidirectional=True, batch_first=True)
 

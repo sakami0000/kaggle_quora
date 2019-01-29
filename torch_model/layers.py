@@ -226,3 +226,21 @@ class CIN(nn.Module):
         out = torch.sum(out, -1)  # [N, H1+H2+...+Hk]
 
         return out
+
+
+class SelfAttention(nn.Module):
+    def __init__(self, h_dim):
+        super(SelfAttention, self).__init__()
+        self.h_dim = h_dim
+        self.main = nn.Sequential(
+            nn.Linear(h_dim, 24),
+            nn.ReLU(True),
+            nn.Linear(24, 1)
+        )
+
+    def forward(self, encoder_outputs):
+        b_size = encoder_outputs.size(0)
+        attn_ene = self.main(encoder_outputs.contiguous().view(-1, self.h_dim))  # (b, s, h) -> (b * s, 1)
+        attns = F.softmax(attn_ene.view(b_size, -1), dim=1).unsqueeze(2)  # (b * s, 1) -> (b, s, 1)
+        out = (encoder_outputs * attns).sum(dim=1)  # (b, s, h) -> (b, h)
+        return out
