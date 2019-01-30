@@ -244,3 +244,14 @@ class SelfAttention(nn.Module):
         attns = F.softmax(attn_ene.view(b_size, -1), dim=1).unsqueeze(2)  # (b * s, 1) -> (b, s, 1)
         out = (encoder_outputs * attns).sum(dim=1)  # (b, s, h) -> (b, h)
         return out
+
+
+class GaussianNoise(nn.Module):
+    def __init__(self, stddev):
+        super().__init__()
+        self.stddev = stddev
+
+    def forward(self, din):
+        if self.training:
+            return din + torch.randn(din.size()).cuda() * self.stddev
+        return din
