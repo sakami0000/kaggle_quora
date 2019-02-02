@@ -1,6 +1,7 @@
 import re
 import string
 
+from nltk.sentiment.vader import SentimentIntensityAnalyzer as SIA
 import numpy as np
 from scipy import sparse
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -68,6 +69,9 @@ def replace_typical_misspell(text):
     return misspellings_re.sub(replace, text)
 
 
+sia = SIA()
+
+
 def add_features(embeddings_index, df):
 
     df['question_text'] = df['question_text'].apply(lambda x: str(x))
@@ -84,6 +88,8 @@ def add_features(embeddings_index, df):
     df['oov'] = df['question_text'].apply(
         lambda comment: sum(1 for w in comment.split() if embeddings_index.get(w) is None))
     df['oov_vs_words'] = df['oov'] / df['num_words']
+
+    df['compound'] = df['question_text'].apply(lambda x: sia.polarity_scores(x)['compound'])
 
     return df
 
