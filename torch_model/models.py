@@ -187,3 +187,49 @@ class CINNet(nn.Module):
         out = self.out(cin)
 
         return out
+
+
+class LstmForwardBackward(nn.Module):
+    def __init__(self, embedding_matrix):
+        super(LstmForwardBackward, self).__init__()
+
+        lstm_hidden_size = 120
+        gru_hidden_size = 60
+        self.gru_hidden_size = gru_hidden_size
+
+        self.embedding = nn.Embedding(max_features, embed_size)
+        self.embedding.weight = nn.Parameter(torch.tensor(embedding_matrix, dtype=torch.float32))
+        self.embedding.weight.requires_grad = False
+        self.embedding_dropout = nn.Dropout2d(0.1)
+
+        self.lstm = nn.LSTM(embed_size, lstm_hidden_size, bidirectional=True, batch_first=True)
+        self.gru = nn.GRU(lstm_hidden_size * 2, gru_hidden_size, bidirectional=True, batch_first=True)
+
+        self.linear = nn.Linear(gru_hidden_size * 6 + 1, 16)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.1)
+        self.bn = nn.BatchNorm1d(16)
+        self.out = nn.Linear(16, 1)
+
+    def forward(self, x):
+        h_embedding = self.embedding(x[0])
+        h_embedding = torch.squeeze(self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
+
+        h_lstm, _ = self.lstm(h_embedding)
+        h_gru, _ = self.gru(h_lstm)
+
+        h_gru_forward = h_gru[:, -1, :self.gru_hidden_size]
+        h_gru_reverse = h_gru[:, 0, self.gru_hidden_size:]
+
+        avg_pool = torch.mean(h_gru, 1)
+        max_pool, _ = torch.max(h_gru, 1)
+
+        f = torch.tensor(x[1], dtype=torch.float).cuda()
+
+        conc = torch.cat((h_gru_forward, h_gru_reverse, avg_pool, max_pool, f), 1)
+        conc = self.relu(self.linear(conc))
+        conc = self.dropout(conc)
+        conc = self.bn(conc)
+        out = self.out(conc)
+
+        return out
