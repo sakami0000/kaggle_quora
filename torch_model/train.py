@@ -7,9 +7,10 @@ import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 import torch
 
-from config import seed, seed_torch
+from config import seed
 from load_data import load_and_prec, load_glove, load_para
 from torch_model.callbacks import CyclicLR
+from torch_model.utils import seed_torch
 from utils import cos_annealing_lr, scoring, sigmoid
 
 warnings.filterwarnings('ignore')
