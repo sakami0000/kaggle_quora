@@ -13,6 +13,7 @@ def train(max_iter=40, n_splits=20):
     train = pd.read_csv('../input/train.csv')
     test = pd.read_csv('../input/test.csv')
 
+    # TF-IDF feature
     tfidf = TfidfVectorizer(
         ngram_range=(1, 4),
         tokenizer=tokenize,
@@ -28,10 +29,12 @@ def train(max_iter=40, n_splits=20):
     test_x = tfidf.transform(test['question_text'])
     train_y = train['target'].values
 
+    # Naive Bayes scaling
     nb_transformer = NBFeaturer(alpha=1).fit(train_x, train_y)
     train_nb = nb_transformer.transform(train_x)
     test_nb = nb_transformer.transform(test_x)
 
+    # train
     models = []
     train_meta = np.zeros(train_y.shape)
     test_meta = np.zeros(test_x.shape[0])
@@ -53,8 +56,10 @@ def train(max_iter=40, n_splits=20):
         train_meta[valid_idx] = valid_pred[:, 1]
         test_meta += model.predict_proba(test_nb)[:, 1] / len(splits)
 
+    # search threshold
     best_th = threshold_search(train_y, train_meta)
 
+    # submit
     sub = pd.read_csv('../input/sample_submission.csv')
     sub.prediction = test_meta > best_th
     sub.to_csv('submission.csv', index=False)
