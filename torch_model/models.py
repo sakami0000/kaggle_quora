@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from config import max_features, maxlen, embed_size
 from torch_model.layers import Attention, CapsuleLayer, WeightDrop, CIN, SelfAttention
@@ -30,7 +31,8 @@ class SelfAttentionClassifier(nn.Module):
 
     def forward(self, x):
         h_embedding = self.embedding(x[0])
-        h_embedding = torch.squeeze(self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
+        h_embedding = torch.squeeze(
+            self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
 
         h_lstm, _ = self.lstm(h_embedding)
         h_gru, _ = self.gru(h_lstm)
@@ -80,7 +82,8 @@ class WeightDropLstm(nn.Module):
 
     def forward(self, x):
         h_embedding = self.embedding(x[0])
-        h_embedding = torch.squeeze(self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
+        h_embedding = torch.squeeze(
+            self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
 
         h_lstm, _ = self.lstm(h_embedding)
         h_gru, hh_gru = self.gru(h_lstm)
@@ -137,7 +140,8 @@ class CapsuleNet(nn.Module):
 
     def forward(self, x):
         h_embedding = self.embedding(x[0])
-        h_embedding = torch.squeeze(self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
+        h_embedding = torch.squeeze(
+            self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
 
         h_lstm, _ = self.lstm(h_embedding)
         h_gru, _ = self.gru(h_lstm)
@@ -181,7 +185,8 @@ class CINNet(nn.Module):
 
     def forward(self, x):
         h_embedding = self.embedding(x[0])
-        h_embedding = torch.squeeze(self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
+        h_embedding = torch.squeeze(
+            self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
 
         cin = self.cin(h_embedding)
         out = self.out(cin)
@@ -213,7 +218,8 @@ class LstmForwardBackward(nn.Module):
 
     def forward(self, x):
         h_embedding = self.embedding(x[0])
-        h_embedding = torch.squeeze(self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
+        h_embedding = torch.squeeze(
+            self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
 
         h_lstm, _ = self.lstm(h_embedding)
         h_gru, _ = self.gru(h_lstm)
@@ -232,4 +238,58 @@ class LstmForwardBackward(nn.Module):
         conc = self.bn(conc)
         out = self.out(conc)
 
+        return out
+
+
+class PackedSequenceLstm(nn.Module):
+    def __init__(self, embedding_matrix):
+        super(PackedSequenceLstm, self).__init__()
+
+        lstm_hidden_size = 120
+        gru_hidden_size = 60
+        self.gru_hidden_size = gru_hidden_size
+
+        self.embedding = nn.Embedding(max_features, embed_size)
+        self.embedding.weight = nn.Parameter(torch.tensor(embedding_matrix, dtype=torch.float32))
+        self.embedding.weight.requires_grad = False
+        self.embedding_dropout = nn.Dropout2d(0.1)
+
+        self.lstm = nn.LSTM(embed_size, lstm_hidden_size, bidirectional=True, batch_first=True)
+        self.gru = nn.GRU(lstm_hidden_size * 2, gru_hidden_size, bidirectional=True, batch_first=True)
+
+        self.linear = nn.Linear(gru_hidden_size * 6 + 1, 16)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.1)
+        self.bn = nn.BatchNorm1d(16)
+        self.out = nn.Linear(16, 1)
+
+    def forward(self, x, l):
+        l, sort_idx = torch.sort(l, descending=True)
+        inp = x[0][sort_idx]
+        f = x[1][sort_idx]
+
+        h_embedding = self.embedding(inp)
+        h_embedding = torch.unsqueeze(h_embedding.transpose(1, 2), 2)
+        h_embedding = torch.squeeze(self.embedding_dropout(h_embedding)).transpose(1, 2)
+
+        h_embedding = pack_padded_sequence(h_embedding, l, batch_first=True)
+
+        h_lstm, _ = self.lstm(h_embedding)
+        h_gru, hh_gru = self.gru(h_lstm)
+
+        h_gru, _ = pad_packed_sequence(h_gru, batch_first=True)
+        hh_gru = hh_gru.view(-1, self.gru_hidden_size * 2)
+
+        avg_pool = torch.mean(h_gru, 1)
+        max_pool, _ = torch.max(h_gru, 1)
+
+        f = torch.tensor(f, dtype=torch.float).cuda()
+
+        conc = torch.cat((hh_gru, avg_pool, max_pool, f), 1)
+        conc = self.relu(self.linear(conc))
+        conc = self.dropout(conc)
+        conc = self.bn(conc)
+        out = self.out(conc)
+
+        out = out[torch.argsort(sort_idx)]
         return out

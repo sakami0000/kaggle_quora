@@ -20,20 +20,20 @@ def load_and_prec():
     test_df = pd.read_csv('../input/test.csv')
 
     # lower
-    train_df['question_text'] = train_df['question_text'].apply(lambda x: x.lower())
-    test_df['question_text'] = test_df['question_text'].apply(lambda x: x.lower())
+    train_df['question_text'] = train_df['question_text'].str.lower()
+    test_df['question_text'] = test_df['question_text'].str.lower()
 
     # clean the text
-    train_df['question_text'] = train_df['question_text'].apply(lambda x: clean_text(x))
-    test_df['question_text'] = test_df['question_text'].apply(lambda x: clean_text(x))
+    train_df['question_text'] = train_df['question_text'].apply(clean_text)
+    test_df['question_text'] = test_df['question_text'].apply(clean_text)
 
     # clean numbers
-    train_df['question_text'] = train_df['question_text'].apply(lambda x: clean_numbers(x))
-    test_df['question_text'] = test_df['question_text'].apply(lambda x: clean_numbers(x))
+    train_df['question_text'] = train_df['question_text'].apply(clean_numbers)
+    test_df['question_text'] = test_df['question_text'].apply(clean_numbers)
 
     # clean spellings
-    train_df['question_text'] = train_df['question_text'].apply(lambda x: replace_typical_misspell(x))
-    test_df['question_text'] = test_df['question_text'].apply(lambda x: replace_typical_misspell(x))
+    train_df['question_text'] = train_df['question_text'].apply(replace_typical_misspell)
+    test_df['question_text'] = test_df['question_text'].apply(replace_typical_misspell)
 
     # fill up the missing values
     train_x = train_df['question_text'].fillna('_##_').values
@@ -76,6 +76,78 @@ def load_and_prec():
     features = features[trn_idx]
 
     return train_x, test_x, train_y, features, test_features, tokenizer.word_index, embeddings_index
+
+
+def load_and_prec_with_len():
+    train_df = pd.read_csv('../input/train.csv')
+    test_df = pd.read_csv('../input/test.csv')
+
+    # lower
+    train_df['question_text'] = train_df['question_text'].str.lower()
+    test_df['question_text'] = test_df['question_text'].str.lower()
+
+    # clean the text
+    train_df['question_text'] = train_df['question_text'].apply(clean_text)
+    test_df['question_text'] = test_df['question_text'].apply(clean_text)
+
+    # clean numbers
+    train_df['question_text'] = train_df['question_text'].apply(clean_numbers)
+    test_df['question_text'] = test_df['question_text'].apply(clean_numbers)
+
+    # clean spellings
+    train_df['question_text'] = train_df['question_text'].apply(replace_typical_misspell)
+    test_df['question_text'] = test_df['question_text'].apply(replace_typical_misspell)
+
+    # fill up the missing values
+    train_x = train_df['question_text'].fillna('_##_').values
+    test_x = test_df['question_text'].fillna('_##_').values
+
+    # load embedding
+    embeddings_index = dict(get_coefs(*o.split(' ')) for o in open(EMBEDDING_GLOVE))
+
+    # add features
+    train = add_features(embeddings_index, train_df)
+    test = add_features(embeddings_index, test_df)
+
+    features = train[['oov_vs_words']].fillna(0).astype('float64')
+    test_features = test[['oov_vs_words']].fillna(0).astype('float64')
+
+    ss = StandardScaler()
+    ss.fit(np.vstack((features, test_features)))
+    features = ss.transform(features)
+    test_features = ss.transform(test_features)
+
+    # add sentence length feature
+    train_len = train['num_words'].fillna(0).values
+    test_len = test['num_words'].fillna(0).values
+
+    train_len[train_len > maxlen] = maxlen
+    test_len[test_len > maxlen] = maxlen
+
+    # tokenize the sentences
+    tokenizer = Tokenizer(num_words=max_features)
+    tokenizer.fit_on_texts(list(train_x))
+    train_x = tokenizer.texts_to_sequences(train_x)
+    test_x = tokenizer.texts_to_sequences(test_x)
+
+    # pad the sentences
+    train_x = pad_sequences(train_x, maxlen=maxlen, padding='post')
+    test_x = pad_sequences(test_x, maxlen=maxlen, padding='post')
+
+    # get the target values
+    train_y = train_df['target'].values
+
+    # shuffling the data
+    np.random.seed(seed)
+    trn_idx = np.random.permutation(len(train_x))
+
+    train_x = train_x[trn_idx]
+    train_y = train_y[trn_idx]
+    features = features[trn_idx]
+    train_len = train_len[trn_idx]
+
+    return train_x, test_x, train_y, features, test_features,\
+        train_len, test_len, tokenizer.word_index, embeddings_index
 
 
 def load_glove(embeddings_index, word_index):
