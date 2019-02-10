@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from config import seed, max_features, maxlen
+from config import seed, max_features, maxlen, embed_size
 from preprocessing import clean_text, clean_numbers, replace_typical_misspell, add_features
 
 EMBEDDING_GLOVE = '../input/embeddings/glove.840B.300d/glove.840B.300d.txt'
@@ -153,7 +153,6 @@ def load_and_prec_with_len():
 def load_glove(embeddings_index, word_index):
     all_embs = np.stack(embeddings_index.values())
     emb_mean, emb_std = all_embs.mean(), all_embs.std()
-    embed_size = all_embs.shape[1]
 
     # word_index = tokenizer.word_index
     nb_words = min(max_features, len(word_index))
@@ -183,7 +182,6 @@ def load_para(word_index):
 
     all_embs = np.stack(embeddings_index.values())
     emb_mean, emb_std = all_embs.mean(), all_embs.std()
-    embed_size = all_embs.shape[1]
 
     # word_index = tokenizer.word_index
     nb_words = min(max_features, len(word_index))
@@ -201,5 +199,28 @@ def load_para(word_index):
             embedding_vector = embeddings_index.get(word.capitalize())
             if embedding_vector is not None:
                 embedding_matrix[i] = embedding_vector
+
+    return embedding_matrix
+
+
+def load_para_fast(word_index):
+    emb_mean, emb_std = -0.0053247833, 0.49346462
+
+    # word_index = tokenizer.word_index
+    nb_words = min(max_features, len(word_index))
+    embedding_matrix = np.random.normal(emb_mean, emb_std, (nb_words, embed_size))
+
+    with open(EMBEDDING_PARA, 'r', encoding='utf8', errors='ignore') as f:
+        for line in f:
+            if len(line) > 100:
+                word, vec = line.split(' ', 1)
+                if word not in word_index:
+                    continue
+                i = word_index[word]
+                if i >= max_features:
+                    continue
+                embedding_vector = np.asarray(vec.split(' '), dtype='float32')[:300]
+                if len(embedding_vector) == 300:
+                    embedding_matrix[i] = embedding_vector
 
     return embedding_matrix
