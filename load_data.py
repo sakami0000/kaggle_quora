@@ -1,11 +1,13 @@
+import gc
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
+from multiprocessing import Pool
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 from config import seed, max_features, maxlen, embed_size
-from preprocessing import clean_text, clean_numbers, replace_typical_misspell, add_features
+from preprocessing import clean_text, clean_numbers, replace_typical_misspell, add_features, preprocess
 
 EMBEDDING_GLOVE = '../input/embeddings/glove.840B.300d/glove.840B.300d.txt'
 EMBEDDING_PARA = '../input/embeddings/paragram_300_sl999/paragram_300_sl999.txt'
@@ -76,6 +78,60 @@ def load_and_prec():
     features = features[trn_idx]
 
     return train_x, test_x, train_y, features, test_features, tokenizer.word_index, embeddings_index
+
+
+def load_and_prec_2():
+    train_df = pd.read_csv('../input/train.csv')
+    test_df = pd.read_csv('../input/test.csv')
+
+    # load embedding
+    global embeddings_index
+    embeddings_index = dict(get_coefs(*o.split(' ')) for o in open(EMBEDDING_GLOVE))
+
+    # preprocess
+    pool = Pool(processes=4)
+    train_array = pool.map(preprocess, train_df['question_text'].values)
+    test_array = pool.map(preprocess, test_df['question_text'].values)
+    pool.close()
+    gc.collect()
+
+    train = pd.DataFrame(train_array, columns=['question_text', 'oov_vs_words'])
+    test = pd.DataFrame(test_array, columns=['question_text', 'oov_vs_words'])
+
+    train_x = train['question_text'].fillna('_##_').values
+    test_x = test['question_text'].fillna('_##_').values
+
+    # features
+    features = train[['oov_vs_words']].fillna(0).astype('float64')
+    test_features = test[['oov_vs_words']].fillna(0).astype('float64')
+
+    ss = StandardScaler()
+    ss.fit(np.vstack((features, test_features)))
+    features = ss.transform(features)
+    test_features = ss.transform(test_features)
+
+    # tokenize the sentences
+    tokenizer = Tokenizer(num_words=max_features)
+    tokenizer.fit_on_texts(list(train_x))
+    train_x = tokenizer.texts_to_sequences(train_x)
+    test_x = tokenizer.texts_to_sequences(test_x)
+
+    # pad the sentences
+    train_x = pad_sequences(train_x, maxlen=maxlen)
+    test_x = pad_sequences(test_x, maxlen=maxlen)
+
+    # get the target values
+    train_y = train_df['target'].values
+
+    # shuffling the data
+    np.random.seed(seed)
+    trn_idx = np.random.permutation(len(train_x))
+
+    train_x = train_x[trn_idx]
+    train_y = train_y[trn_idx]
+    features = features[trn_idx]
+
+    return train_x, test_x, train_y, features, test_features, tokenizer.word_index
 
 
 def load_and_prec_with_len():
