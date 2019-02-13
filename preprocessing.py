@@ -7,9 +7,9 @@ import numpy as np
 from scipy import sparse
 from sklearn.base import BaseEstimator, TransformerMixin
 
-# -------------
-# preprocess 1
-# -------------
+# --------------
+#  preprocess 1
+# --------------
 
 puncts = [',', '.', '"', ':', ')', '(', '-', '!', '?', '|', ';', "'", '$', '&',
           '/', '[', ']', '>', '%', '=', '#', '*', '+', '\\', '•',  '~', '@', '£',
@@ -78,7 +78,7 @@ sia = SIA()
 def add_features(embeddings_index, df):
     df['question_text'] = df['question_text'].map(str)
 
-    df['total_length'] = df['question_text'].apply(len)
+    df['total_length'] = df['question_text'].map(len)
     df['capitals'] = df['question_text'].apply(lambda comment: sum(1 for c in comment if c.isupper()))
     df['caps_vs_length'] = df.apply(
         lambda row: float(row['capitals']) / float(row['total_length']), axis=1)
@@ -97,9 +97,9 @@ def add_features(embeddings_index, df):
     return df
 
 
-# -------------
-# preprocess 2
-# -------------
+# --------------
+#  preprocess 2
+# --------------
 
 
 def clean_misspell(text):
@@ -449,21 +449,21 @@ def decontracted(text):
     de-contract the contraction
     """
     # specific
-    text = re.sub(r'[Ww]on[\'’]t', 'will not', text)
-    text = re.sub(r'[Cc]an[\'’]t', 'can not', text)
-    text = re.sub(r'[Yy][\'’]all', 'you all', text)
-    text = re.sub(r'[Yy]a[\'’]ll', 'you all', text)
+    text = re.sub(r'(W|w)on(\'|\’)t', 'will not', text)
+    text = re.sub(r'(C|c)an(\'|\’)t', 'can not', text)
+    text = re.sub(r'(Y|y)(\'|\’)all', 'you all', text)
+    text = re.sub(r'(Y|y)a(\'|\’)ll', 'you all', text)
 
     # general
-    text = re.sub(r'[Ii][\'’]m', 'i am', text)
-    text = re.sub(r'[Aa]in[\'’]t', 'is not', text)
-    text = re.sub(r'n[\'’]t', ' not', text)
-    text = re.sub(r'[\'’]re', ' are', text)
-    text = re.sub(r'[\'’]s', ' is', text)
-    text = re.sub(r'[\'’]d', ' would', text)
-    text = re.sub(r'[\'’]ll', ' will', text)
-    text = re.sub(r'[\'’]t', ' not', text)
-    text = re.sub(r'[\'’]ve', ' have', text)
+    text = re.sub(r'(I|i)(\'|\’)m', 'i am', text)
+    text = re.sub(r'(A|a)in(\'|\’)t', 'is not', text)
+    text = re.sub(r'n(\'|\’)t', ' not', text)
+    text = re.sub(r'(\'|\’)re', ' are', text)
+    text = re.sub(r'(\'|\’)s', ' is', text)
+    text = re.sub(r'(\'|\’)d', ' would', text)
+    text = re.sub(r'(\'|\’)ll', ' will', text)
+    text = re.sub(r'(\'|\’)t', ' not', text)
+    text = re.sub(r'(\'|\’)ve', ' have', text)
     return text
 
 
@@ -524,7 +524,7 @@ def remove_space(text):
 
 def extract_features(text):
     """
-    embeddings_index from global name space
+    `embeddings_index` from global name space
     """
     num_words = len(text.split())
     oov = sum(1 for w in text.split()
@@ -573,7 +573,7 @@ def preprocess(text, remove_num=True):
 
 
 # ---------------------
-# Logistic Regression
+#  Logistic Regression
 # ---------------------
 
 
