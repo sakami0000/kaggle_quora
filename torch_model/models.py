@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from config import max_features, maxlen, embed_size
-from torch_model.layers import Attention, CapsuleLayer, WeightDrop, CIN, SelfAttention
+from torch_model.layers import Attention, CapsuleLayer, WeightDrop, CIN, SelfAttention, GaussianNoise
 
 
 class SelfAttentionClassifier(nn.Module):
@@ -31,8 +31,8 @@ class SelfAttentionClassifier(nn.Module):
 
     def forward(self, x):
         h_embedding = self.embedding(x[0])
-        h_embedding = torch.squeeze(
-            self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
+        h_embedding = torch.unsqueeze(h_embedding.transpose(1, 2), 2)
+        h_embedding = torch.squeeze(self.embedding_dropout(h_embedding)).transpose(1, 2)
 
         h_lstm, _ = self.lstm(h_embedding)
         h_gru, _ = self.gru(h_lstm)
@@ -82,8 +82,8 @@ class WeightDropLstm(nn.Module):
 
     def forward(self, x):
         h_embedding = self.embedding(x[0])
-        h_embedding = torch.squeeze(
-            self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
+        h_embedding = torch.unsqueeze(h_embedding.transpose(1, 2), 2)
+        h_embedding = torch.squeeze(self.embedding_dropout(h_embedding)).transpose(1, 2)
 
         h_lstm, _ = self.lstm(h_embedding)
         h_gru, hh_gru = self.gru(h_lstm)
@@ -140,8 +140,8 @@ class CapsuleNet(nn.Module):
 
     def forward(self, x):
         h_embedding = self.embedding(x[0])
-        h_embedding = torch.squeeze(
-            self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
+        h_embedding = torch.unsqueeze(h_embedding.transpose(1, 2), 2)
+        h_embedding = torch.squeeze(self.embedding_dropout(h_embedding)).transpose(1, 2)
 
         h_lstm, _ = self.lstm(h_embedding)
         h_gru, _ = self.gru(h_lstm)
@@ -185,8 +185,8 @@ class CINNet(nn.Module):
 
     def forward(self, x):
         h_embedding = self.embedding(x[0])
-        h_embedding = torch.squeeze(
-            self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
+        h_embedding = torch.unsqueeze(h_embedding.transpose(1, 2), 2)
+        h_embedding = torch.squeeze(self.embedding_dropout(h_embedding)).transpose(1, 2)
 
         cin = self.cin(h_embedding)
         out = self.out(cin)
@@ -207,6 +207,7 @@ class LstmForwardBackward(nn.Module):
         self.embedding.weight.requires_grad = False
         self.embedding_dropout = nn.Dropout2d(0.1)
 
+        self.gn = GaussianNoise(0.15)
         self.lstm = nn.LSTM(embed_size, lstm_hidden_size, bidirectional=True, batch_first=True)
         self.gru = nn.GRU(lstm_hidden_size * 2, gru_hidden_size, bidirectional=True, batch_first=True)
 
@@ -218,8 +219,9 @@ class LstmForwardBackward(nn.Module):
 
     def forward(self, x):
         h_embedding = self.embedding(x[0])
-        h_embedding = torch.squeeze(
-            self.embedding_dropout(torch.unsqueeze(h_embedding, 0)))
+        h_embedding = self.gn(h_embedding)
+        h_embedding = torch.unsqueeze(h_embedding.transpose(1, 2), 2)
+        h_embedding = torch.squeeze(self.embedding_dropout(h_embedding)).transpose(1, 2)
 
         h_lstm, _ = self.lstm(h_embedding)
         h_gru, _ = self.gru(h_lstm)
