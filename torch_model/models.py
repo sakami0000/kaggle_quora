@@ -295,3 +295,57 @@ class PackedSequenceLstm(nn.Module):
 
         out = out[torch.argsort(sort_idx)]
         return out
+
+
+class LstmConv(nn.Module):
+    def __init__(self, embedding_matrix):
+        super(LstmConv, self).__init__()
+
+        hidden_size = 64
+
+        self.embedding = nn.Embedding(max_features, embed_size)
+        self.embedding.weight = nn.Parameter(torch.tensor(embedding_matrix, dtype=torch.float32))
+        self.embedding.weight.requires_grad = False
+        self.embedding_dropout = nn.Dropout2d(0.2)
+
+        self.lstm = nn.LSTM(embed_size, hidden_size, bidirectional=True, batch_first=True)
+        self.gru = nn.GRU(hidden_size * 2, hidden_size, bidirectional=True, batch_first=True)
+
+        self.lstm_attention = Attention(hidden_size * 2, maxlen)
+        self.gru_attention = Attention(hidden_size * 2, maxlen)
+
+        self.conv = nn.Conv1d(maxlen, hidden_size, 3, padding=2)
+        nn.init.xavier_uniform_(self.conv.weight)
+
+        self.linear = nn.Linear(hidden_size * 12, 32)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.1)
+        self.out = nn.Linear(32, 1)
+
+    def forward(self, x):
+        h_embedding = self.embedding(x)
+        h_embedding = torch.unsqueeze(h_embedding.transpose(1, 2), 2)
+        h_embedding = torch.squeeze(self.embedding_dropout(h_embedding)).transpose(1, 2)
+
+        h_lstm, _ = self.lstm(h_embedding)
+        h_gru, _ = self.gru(h_lstm)
+
+        h_lstm_attn = self.lstm_attention(h_lstm)
+        h_gru_attn = self.gru_attention(h_gru)
+
+        gru_avg_pool = torch.mean(h_gru, 1)
+        gru_max_pool, _ = torch.max(h_gru, 1)
+
+        conv = self.conv(h_gru)
+
+        conv_avg_pool = torch.mean(conv, 1)
+        conv_max_pool, _ = torch.max(conv, 1)
+
+        conc = torch.cat((conv_avg_pool, conv_max_pool,
+                          gru_avg_pool, gru_max_pool,
+                          h_gru_attn, h_lstm_attn), 1)
+        conc = self.relu(self.linear(conc))
+        conc = self.dropout(conc)
+        out = self.out(conc)
+
+        return out
