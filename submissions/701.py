@@ -145,10 +145,6 @@ def load_and_prec():
     print('Train shape : ', train_df.shape)
     print('Test shape : ', test_df.shape)
 
-    # lower
-    train_df['question_text'] = train_df['question_text'].str.lower()
-    test_df['question_text'] = test_df['question_text'].str.lower()
-
     # clean the text
     train_df['question_text'] = train_df['question_text'].apply(clean_text)
     test_df['question_text'] = test_df['question_text'].apply(clean_text)
