@@ -267,7 +267,6 @@ class CRF(Layer):
         of timesteps. To introduce masks to your data,
         use an [Embedding](embeddings.md) layer with the `mask_zero` parameter
         set to `True`.
-
     """
     def __init__(self, units,
                  learn_mode='join',

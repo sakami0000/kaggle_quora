@@ -188,18 +188,18 @@ class CIN(nn.Module):
         final_result = []
         hidden_layers = []
 
-        x0 = torch.transpose(x, 1, 2)  # [N, K, H0]
+        x0 = torch.transpose(x, 1, 2)  # (N, K, H0)
         hidden_layers.append(x0)
-        x0 = x0.unsqueeze(-1)  # [N, K, H0, 1]
+        x0 = x0.unsqueeze(-1)  # (N, K, H0, 1)
 
         for idx, layer_size in enumerate(self.layer_sizes[:-1]):
-            xk = hidden_layers[-1].unsqueeze(2)  # [N, K, 1, H_(k-1)]
-            out_product = torch.matmul(x0, xk)  # [N, K, H0, H_(k-1)]
+            xk = hidden_layers[-1].unsqueeze(2)  # (N, K, 1, H_(k-1))
+            out_product = torch.matmul(x0, xk)  # (N, K, H0, H_(k-1))
             out_product = out_product.view(batch_size, embed_size,
-                                           self.layer_sizes[0] * layer_size)  # [N, K, H0*H_(k-1)]
-            out_product = out_product.transpose(1, 2)  # [N, H0*H_(k-1), K]
+                                           self.layer_sizes[0] * layer_size)  # (N, K, H0*H_(k-1))
+            out_product = out_product.transpose(1, 2)  # (N, H0*H_(k-1), K)
             conv = getattr(self, f'conv1d_{idx+1}')
-            zk = conv(out_product)  # [N, Hk*2, K] or [N, Hk, K]
+            zk = conv(out_product)  # (N, Hk*2, K) or (N, Hk, K)
 
             if self.bn:
                 bn = getattr(self, f'conv1d_bn_{idx+1}')
@@ -209,21 +209,21 @@ class CIN(nn.Module):
                 zk = F.relu(zk)
 
             if self.direct:
-                direct_connect = zk  # [N, Hk, K]
-                next_hidden = zk.transpose(1, 2)  # [N, K, Hk]
+                direct_connect = zk  # (N, Hk, K)
+                next_hidden = zk.transpose(1, 2)  # (N, K, Hk)
             else:
                 if idx != len(self.layer_sizes) - 2:
                     direct_connect, next_hidden = zk.split(self.layer_sizes[idx + 1], 1)
-                    next_hidden = next_hidden.transpose(1, 2)  # [N, K, Hk]
+                    next_hidden = next_hidden.transpose(1, 2)  # (N, K, Hk)
                 else:
-                    direct_connect = zk  # [N, Hk, K]
+                    direct_connect = zk  # (N, Hk, K)
                     next_hidden = 0
 
             final_result.append(direct_connect)
             hidden_layers.append(next_hidden)
 
-        out = torch.cat(final_result, 1)  # [N, H1+H2+...+Hk, K]
-        out = torch.sum(out, -1)  # [N, H1+H2+...+Hk]
+        out = torch.cat(final_result, 1)  # (N, H1+H2+...+Hk, K)
+        out = torch.sum(out, -1)  # (N, H1+H2+...+Hk)
 
         return out
 
