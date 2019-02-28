@@ -5,13 +5,11 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold
 
 from config import seed
-from preprocessing import NBFeaturer, tokenize
+from logistic_regression.preprocessing import NBFeaturer, tokenize
 from utils import threshold_search
 
 
-def train(max_iter=40, n_splits=20):
-    train = pd.read_csv('../input/train.csv')
-    test = pd.read_csv('../input/test.csv')
+def train_logreg(train, test, max_iter=40, n_splits=20):
 
     # TF-IDF feature
     tfidf = TfidfVectorizer(
@@ -59,7 +57,7 @@ def train(max_iter=40, n_splits=20):
     # search threshold
     best_th = threshold_search(train_y, train_meta)
 
-    # submit
-    sub = pd.read_csv('../input/sample_submission.csv')
-    sub.prediction = test_meta > best_th
-    sub.to_csv('submission.csv', index=False)
+    # predict
+    preds = (test_meta > best_th).astype(int)
+
+    return preds

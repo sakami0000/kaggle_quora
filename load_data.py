@@ -4,6 +4,7 @@ from keras.preprocessing.text import Tokenizer
 from multiprocessing import Pool
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 from config import seed, max_features, maxlen, embed_size
@@ -77,7 +78,10 @@ def load_and_prec():
     train_y = train_y[trn_idx]
     features = features[trn_idx]
 
-    return train_x, test_x, train_y, features, test_features, tokenizer.word_index, embeddings_index
+    train = (train_x, train_y, features)
+    test = (test_x, test_features)
+
+    return train, test, tokenizer.word_index, embeddings_index
 
 
 def load_and_prec_2():
@@ -131,7 +135,10 @@ def load_and_prec_2():
     train_y = train_y[trn_idx]
     features = features[trn_idx]
 
-    return train_x, test_x, train_y, features, test_features, tokenizer.word_index
+    train = (train_x, train_y, features)
+    test = (test_x, test_features)
+
+    return train, test, tokenizer.word_index
 
 
 def load_and_prec_with_len():
@@ -202,11 +209,77 @@ def load_and_prec_with_len():
     features = features[trn_idx]
     train_len = train_len[trn_idx]
 
-    return train_x, test_x, train_y, features, test_features,\
-        train_len, test_len, tokenizer.word_index, embeddings_index
+    train = (train_x, train_y, features, train_len)
+    test = (test_x, test_features, test_len)
+
+    return train, test, tokenizer.word_index, embeddings_index
 
 
-def load_glove(embeddings_index, word_index):
+def load_and_prec_with_val():
+    train_df = pd.read_csv('../input/train.csv')
+    test_df = pd.read_csv('../input/test.csv')
+
+    # lower
+    train_df['question_text'] = train_df['question_text'].str.lower()
+    test_df['question_text'] = test_df['question_text'].str.lower()
+
+    # clean the text
+    train_df['question_text'] = train_df['question_text'].apply(clean_text)
+    test_df['question_text'] = test_df['question_text'].apply(clean_text)
+
+    # clean numbers
+    train_df['question_text'] = train_df['question_text'].apply(clean_numbers)
+    test_df['question_text'] = test_df['question_text'].apply(clean_numbers)
+
+    # clean spellings
+    train_df['question_text'] = train_df['question_text'].apply(replace_typical_misspell)
+    test_df['question_text'] = test_df['question_text'].apply(replace_typical_misspell)
+
+    # split to train and valid
+    train_df, valid_df = train_test_split(train_df, test_size=0.001, random_state=seed)
+
+    # fill up the missing values
+    train_x = train_df['question_text'].fillna('_##_').values
+    valid_x = valid_df['question_text'].fillna('_##_').values
+    test_x = test_df['question_text'].fillna('_##_').values
+
+    # tokenize the sentences
+    tokenizer = Tokenizer(num_words=max_features)
+    tokenizer.fit_on_texts(list(train_x))
+    train_x = tokenizer.texts_to_sequences(train_x)
+    valid_x = tokenizer.texts_to_sequences(valid_x)
+    test_x = tokenizer.texts_to_sequences(test_x)
+
+    # pad the sentences
+    train_x = pad_sequences(train_x, maxlen=maxlen)
+    valid_x = pad_sequences(valid_x, maxlen=maxlen)
+    test_x = pad_sequences(test_x, maxlen=maxlen)
+
+    # get the target values
+    train_y = train_df['target'].values
+    valid_y = valid_df['target'].values
+
+    # shuffling the data
+    np.random.seed(seed)
+    trn_idx = np.random.permutation(len(train_x))
+    val_idx = np.random.permutation((len(valid_x)))
+
+    train_x = train_x[trn_idx]
+    train_y = train_y[trn_idx]
+    valid_x = valid_x[val_idx]
+    valid_y = valid_y[val_idx]
+
+    train = (train_x, train_y)
+    valid = (valid_x, valid_y)
+    test = (test_x,)
+
+    return train, valid, test, tokenizer.word_index
+
+
+def load_glove(word_index, embeddings_index=None):
+    if embeddings_index is None:
+        embeddings_index = dict(get_coefs(*o.split(' ')) for o in open(EMBEDDING_GLOVE))
+
     all_embs = np.stack(embeddings_index.values())
     emb_mean, emb_std = all_embs.mean(), all_embs.std()
 

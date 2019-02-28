@@ -1,14 +1,11 @@
-import gc
 import time
 import warnings
 
 import numpy as np
-import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 import torch
 
 from config import seed
-from load_data import load_and_prec, load_and_prec_with_len, load_glove, load_para
 from torch_model.callbacks import CyclicLR
 from torch_model.utils import seed_torch, SentenceLengthDataset
 from utils import cos_annealing_lr, scoring, sigmoid
@@ -16,17 +13,10 @@ from utils import cos_annealing_lr, scoring, sigmoid
 warnings.filterwarnings('ignore')
 
 
-def train_torch(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
+def train_torch(train, test, embedding_matrix, neuralnet, train_epochs=5, n_splits=5, batch_size=512):
 
-    # load data
-    train_x, test_x, train_y, features, test_features, word_index, embeddings_index = load_and_prec()
-    embedding_matrix_1 = load_glove(embeddings_index, word_index)
-    embedding_matrix_2 = load_para(word_index)
-
-    embedding_matrix = embedding_matrix_1 * 0.6 + embedding_matrix_2 * 0.4
-
-    del embeddings_index, embedding_matrix_1, embedding_matrix_2
-    gc.collect()
+    train_x, train_y, features = train
+    test_x, test_features = test
 
     # train
     train_preds = np.zeros((len(train_x)))
@@ -117,23 +107,17 @@ def train_torch(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
     # search threshold
     search_result = scoring(train_y, train_preds)
 
-    # submit
-    sub = pd.read_csv('../input/sample_submission.csv')
-    sub.prediction = test_preds > search_result['threshold']
-    sub.to_csv('submission.csv', index=False)
+    # predict
+    preds = (test_preds > search_result['threshold']).astype(int)
+
+    return preds
 
 
-def snapshot_train(neuralnet, n_cycle=2, epochs_per_cycle=5, n_splits=4, batch_size=1024):
+def snapshot_train(train, test, embedding_matrix, neuralnet,
+                   n_cycle=2, epochs_per_cycle=5, n_splits=4, batch_size=1024):
 
-    # load data
-    train_x, test_x, train_y, features, test_features, word_index, embeddings_index = load_and_prec()
-    embedding_matrix_1 = load_glove(embeddings_index, word_index)
-    embedding_matrix_2 = load_para(word_index)
-
-    embedding_matrix = embedding_matrix_1 * 0.6 + embedding_matrix_2 * 0.4
-
-    del embeddings_index, embedding_matrix_1, embedding_matrix_2
-    gc.collect()
+    train_x, train_y, features = train
+    test_x, test_features = test
 
     # train
     train_preds = np.zeros((len(train_x)))
@@ -226,24 +210,16 @@ def snapshot_train(neuralnet, n_cycle=2, epochs_per_cycle=5, n_splits=4, batch_s
     # search threshold
     search_result = scoring(train_y, train_preds)
 
-    # submit
-    sub = pd.read_csv('../input/sample_submission.csv')
-    sub.prediction = test_preds > search_result['threshold']
-    sub.to_csv('submission.csv', index=False)
+    # predict
+    preds = (test_preds > search_result['threshold']).astype(int)
+
+    return preds
 
 
-def packed_train(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
+def packed_train(train, test, embedding_matrix, neuralnet, train_epochs=5, n_splits=5, batch_size=512):
 
-    # load data
-    train_x, test_x, train_y, features, test_features,\
-        train_len, test_len, word_index, embeddings_index = load_and_prec_with_len()
-    embedding_matrix_1 = load_glove(embeddings_index, word_index)
-    embedding_matrix_2 = load_para(word_index)
-
-    embedding_matrix = embedding_matrix_1 * 0.6 + embedding_matrix_2 * 0.4
-
-    del embeddings_index, embedding_matrix_1, embedding_matrix_2
-    gc.collect()
+    train_x, train_y, features, train_len = train
+    test_x, test_features, test_len = test
 
     # train
     train_preds = np.zeros((len(train_x)))
@@ -337,7 +313,7 @@ def packed_train(neuralnet, train_epochs=5, n_splits=5, batch_size=512):
     # search threshold
     search_result = scoring(train_y, train_preds)
 
-    # submit
-    sub = pd.read_csv('../input/sample_submission.csv')
-    sub.prediction = test_preds > search_result['threshold']
-    sub.to_csv('submission.csv', index=False)
+    # predict
+    preds = (test_preds > search_result['threshold']).astype(int)
+
+    return preds

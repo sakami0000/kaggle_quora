@@ -3,9 +3,6 @@ import string
 import unicodedata
 
 from nltk.sentiment.vader import SentimentIntensityAnalyzer as SIA
-import numpy as np
-from scipy import sparse
-from sklearn.base import BaseEstimator, TransformerMixin
 
 # --------------
 #  preprocess 1
@@ -570,33 +567,3 @@ def preprocess(text, remove_num=True):
     oov_vs_words = extract_features(text)
 
     return [text, oov_vs_words]
-
-
-# ---------------------
-#  Logistic Regression
-# ---------------------
-
-
-class NBFeaturer(BaseEstimator, TransformerMixin):
-    def __init__(self, alpha=1):
-        self.alpha = alpha
-
-    def pr(self, x, y_i, y):
-        p = x[y == y_i].sum(0)
-        return (p + self.alpha) / ((y == y_i).sum() + self.alpha)
-
-    def fit(self, x, y):
-        self._r = sparse.csr_matrix(np.log(self.pr(x, 1, y) / self.pr(x, 0, y)))
-        return self
-
-    def preprocess_x(self, x, r):
-        return x.multiply(r)
-
-    def transform(self, x):
-        x_nb = self.preprocess_x(x, self._r)
-        return x_nb
-
-
-def tokenize(s):
-    re_tok = re.compile(f'([{string.punctuation}“”¨«»®´·º½¾¿¡§£₤‘’])')
-    return re_tok.sub(r' \1 ', s).split()

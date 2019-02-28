@@ -5,23 +5,22 @@ from load_data import load_and_prec, load_glove, load_para
 from utils import threshold_search
 
 
-def train_pred(model, epochs=2):
-    # load data
-    train_x, val_x, test_x, train_y, val_y, word_index = load_and_prec()
-    embedding_matrix_1 = load_glove(word_index)
-    embedding_matrix_2 = load_para(word_index)
-    embedding_matrix = np.mean([embedding_matrix_1, embedding_matrix_2], axis=0)
+def train_keras(train, valid, test, embedding_matrix, model, epochs=6, batch_size=512):
+
+    train_x, train_y = train
+    val_x, val_y = valid
+    (test_x,) = test
 
     # train
     model = model(embedding_matrix)
-    model.fit(train_x, train_y, batch_size=512, epochs=epochs, validation_data=(val_x, val_y))
-    pred_val_y = model.predict([val_x], batch_size=1024, verbose=0)
-    pred_test_y = model.predict([test_x], batch_size=1024, verbose=0)
+    model.fit(train_x, train_y, batch_size=batch_size, epochs=epochs, validation_data=(val_x, val_y))
+    pred_val_y = model.predict([val_x], batch_size=batch_size, verbose=0)
+    pred_test_y = model.predict([test_x], batch_size=batch_size, verbose=0)
 
     # search threshold
     best_th = threshold_search(val_y, pred_val_y)
 
-    # submit
-    sub = pd.read_csv('../input/sample_submission.csv')
-    sub.prediction = pred_test_y > best_th
-    sub.to_csv('submission.csv', index=False)
+    # predict
+    preds = (pred_test_y > best_th).astype(int)
+
+    return preds
